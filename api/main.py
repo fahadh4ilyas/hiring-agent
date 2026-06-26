@@ -8,7 +8,6 @@ import tempfile
 import traceback
 import timeit
 import threading
-from pathlib import Path
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -385,9 +384,6 @@ async def score_resume(
 
     # Read uploaded PDF into a temporary file
     contents = await file.read()
-    suffix = ".pdf"
-    if file.filename and file.filename.lower().endswith(".pdf"):
-        suffix = Path(file.filename).suffix or ".pdf"
 
     task_id = str(uuid.uuid4())
 
@@ -415,40 +411,34 @@ async def score_resume(
         return JSONResponse({"status": "processing", "id": task_id})
 
     # --- Synchronous mode (non-blocking: runs in executor thread) ---
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(contents)
-        pdf_path = tmp.name
+    pdf_dir = tempfile.mkdtemp(prefix="resume_")
+    pdf_path = os.path.join(pdf_dir, f"{task_id}.pdf")
+    with open(pdf_path, "wb") as f:
+        f.write(contents)
 
-    try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            _executor,
-            _run_pipeline,
-            pdf_path,
-            effective_model,
-            effective_api_key,
-            base_url,
-            include_resume_data,
-            task_id,
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        _executor,
+        _run_pipeline,
+        pdf_path,
+        effective_model,
+        effective_api_key,
+        base_url,
+        include_resume_data,
+        task_id,
+    )
+
+    with _task_lock:
+        entry = _task_store.get(task_id, {})
+        result = entry.get("result", {})
+
+    if entry.get("status") == "error":
+        return JSONResponse(
+            {
+                "error": entry.get("error", "Unknown error"),
+                "traceback": entry.get("traceback", ""),
+            },
+            status_code=500,
         )
 
-        with _task_lock:
-            entry = _task_store.get(task_id, {})
-            result = entry.get("result", {})
-
-        if entry.get("status") == "error":
-            return JSONResponse(
-                {
-                    "error": entry.get("error", "Unknown error"),
-                    "traceback": entry.get("traceback", ""),
-                },
-                status_code=500,
-            )
-
-        return JSONResponse(result)
-
-    finally:
-        try:
-            os.unlink(pdf_path)
-        except OSError:
-            pass
+    return JSONResponse(result)
