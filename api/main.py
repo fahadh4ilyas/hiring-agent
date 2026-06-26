@@ -14,8 +14,9 @@ _PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
 
-from fastapi import FastAPI, Request, File, UploadFile, Header, Body
+from fastapi import FastAPI, Request, File, UploadFile, Body, Depends
 from fastapi.responses import ORJSONResponse, Response
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .config import config, LOGGER, LOGGER_ACCESS
 
@@ -37,6 +38,8 @@ app = FastAPI(
     "enriches with GitHub signals, and returns a fair, explainable evaluation.",
     version="1.0.0",
 )
+
+security = HTTPBearer(auto_error=False)
 
 
 # ---------------------------------------------------------------------------
@@ -171,17 +174,13 @@ async def score_resume(
     model: Optional[str] = Body(None),
     provider: Optional[str] = Body(None),
     base_url: Optional[str] = Body(None),
-    authorization: Optional[str] = Header(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """
     Score a resume PDF.
 
     Upload a PDF resume and receive a structured evaluation with category
     scores, bonus points, deductions, strengths, and areas for improvement.
-
-    **Headers:**
-    - `Authorization`: Bearer token for the LLM provider (Gemini or
-      OpenAI-compatible). Takes precedence over the environment variable.
 
     **Body (multipart/form-data):**
     - `file` (required): the resume PDF file
@@ -199,8 +198,8 @@ async def score_resume(
 
     # Extract Bearer token from Authorization header
     effective_api_key = None
-    if authorization and authorization.startswith("Bearer "):
-        effective_api_key = authorization[len("Bearer "):]
+    if credentials:
+        effective_api_key = credentials.credentials
 
     # If provider is explicitly set, ensure the model mapping reflects it
     if provider:
