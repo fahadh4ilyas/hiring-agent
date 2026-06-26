@@ -427,18 +427,6 @@ class OpenAIProvider:
             if "top_p" in options:
                 chat_params["top_p"] = options["top_p"]
 
-        # Handle structured output (response_format) via json_schema
-        if "format" in kwargs:
-            schema = kwargs["format"]
-            chat_params["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "response",
-                    "strict": True,
-                    "schema": schema,
-                },
-            }
-
         response = self.client.chat.completions.create(**chat_params)
 
         return {
