@@ -1,3 +1,5 @@
+import asyncio
+import json
 import os
 import sys
 import time
@@ -42,10 +44,43 @@ app = FastAPI(
 
 security = HTTPBearer(auto_error=False)
 
-# Background task storage
+# Background task storage (in-memory + disk persistence)
+RESULTS_DIR = os.path.join(_PARENT_DIR, "cache", "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
 _task_store: dict[str, dict] = {}
 _task_lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=4)
+
+
+def _persist_result(task_id: str, entry: dict):
+    """Write a completed result to disk so it survives restarts."""
+    try:
+        path = os.path.join(RESULTS_DIR, f"{task_id}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(entry, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass  # best-effort persistence
+
+
+def _load_existing_results():
+    """Load previously saved results from disk on startup."""
+    if not os.path.isdir(RESULTS_DIR):
+        return
+    for filename in os.listdir(RESULTS_DIR):
+        if not filename.endswith(".json"):
+            continue
+        task_id = filename[:-5]
+        try:
+            path = os.path.join(RESULTS_DIR, filename)
+            with open(path, encoding="utf-8") as f:
+                entry = json.load(f)
+            _task_store[task_id] = entry
+        except Exception:
+            pass
+
+
+_load_existing_results()
 
 
 def _run_pipeline(pdf_path: str, effective_model: str, effective_api_key: str,
@@ -62,11 +97,13 @@ def _run_pipeline(pdf_path: str, effective_model: str, effective_api_key: str,
         resume_data = pdf_handler.extract_json_from_pdf(pdf_path)
 
         if resume_data is None:
+            entry = {
+                "status": "error",
+                "error": "Failed to extract structured data from the PDF.",
+            }
             with _task_lock:
-                _task_store[task_id] = {
-                    "status": "error",
-                    "error": "Failed to extract structured data from the PDF.",
-                }
+                _task_store[task_id] = entry
+            _persist_result(task_id, entry)
             return
 
         github_data = {}
@@ -120,17 +157,27 @@ def _run_pipeline(pdf_path: str, effective_model: str, effective_api_key: str,
             response_body["resume_data"] = resume_data.model_dump()
 
         with _task_lock:
-            _task_store[task_id] = {"status": "done", "result": response_body}
+            _task_store[task_id] = entry = {"status": "done", "result": response_body}
+        _persist_result(task_id, entry)
 
     except Exception as exc:
         with _task_lock:
-            _task_store[task_id] = {
+            _task_store[task_id] = entry = {
                 "status": "error",
                 "error": str(exc),
                 "traceback": "".join(
                     traceback.format_exception(type(exc), exc, exc.__traceback__)
                 ),
             }
+        _persist_result(task_id, entry)
+
+    finally:
+        # Clean up temp PDF and its directory (background-mode files)
+        try:
+            os.unlink(pdf_path)
+            os.rmdir(os.path.dirname(pdf_path))
+        except OSError:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -367,82 +414,38 @@ async def score_resume(
 
         return JSONResponse({"status": "processing", "id": task_id})
 
-    # --- Synchronous mode ---
+    # --- Synchronous mode (non-blocking: runs in executor thread) ---
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(contents)
         pdf_path = tmp.name
 
     try:
-        start_time = time.time()
-
-        pdf_handler = PDFHandler(
-            model_name=effective_model,
-            api_key=effective_api_key,
-            base_url=base_url,
-        )
-        resume_data = pdf_handler.extract_json_from_pdf(pdf_path)
-
-        if resume_data is None:
-            return JSONResponse(
-                {"error": "Failed to extract structured data from the PDF."},
-                status_code=422,
-            )
-
-        github_data = {}
-        profiles = []
-        if resume_data and hasattr(resume_data, "basics") and resume_data.basics:
-            profiles = resume_data.basics.profiles or []
-
-        github_profile = _find_profile(profiles, "Github")
-        if github_profile:
-            github_data = fetch_and_display_github_info(
-                github_profile.url,
-                model_name=effective_model,
-                api_key=effective_api_key,
-                base_url=base_url,
-            )
-
-        model_params = MODEL_PARAMETERS.get(effective_model)
-        evaluator = ResumeEvaluator(
-            model_name=effective_model,
-            model_params=model_params,
-            api_key=effective_api_key,
-            base_url=base_url,
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            _executor,
+            _run_pipeline,
+            pdf_path,
+            effective_model,
+            effective_api_key,
+            base_url,
+            include_resume_data,
+            task_id,
         )
 
-        resume_text = convert_json_resume_to_text(resume_data)
-        if github_data:
-            github_text = convert_github_data_to_text(github_data)
-            resume_text += github_text
-
-        evaluation = evaluator.evaluate_resume(resume_text)
-
-        candidate_name = file.filename or "Candidate"
-        if (
-            resume_data
-            and hasattr(resume_data, "basics")
-            and resume_data.basics
-            and resume_data.basics.name
-        ):
-            candidate_name = resume_data.basics.name
-
-        elapsed = round(time.time() - start_time, 2)
-
-        response_body = {
-            "id": task_id,
-            "candidate": candidate_name,
-            "evaluation": _serialize_evaluation(evaluation),
-            "elapsed_seconds": elapsed,
-        }
-
-        if include_resume_data and resume_data:
-            response_body["resume_data"] = resume_data.model_dump()
-
-        # Also cache in background store so GET /score works for sync calls too
         with _task_lock:
-            _task_store[task_id] = {"status": "done", "result": response_body}
+            entry = _task_store.get(task_id, {})
+            result = entry.get("result", {})
 
-        return JSONResponse(response_body)
+        if entry.get("status") == "error":
+            return JSONResponse(
+                {
+                    "error": entry.get("error", "Unknown error"),
+                    "traceback": entry.get("traceback", ""),
+                },
+                status_code=500,
+            )
+
+        return JSONResponse(result)
 
     finally:
         try:
