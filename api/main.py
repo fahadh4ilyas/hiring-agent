@@ -83,7 +83,8 @@ _load_existing_results()
 
 
 def _run_pipeline(pdf_path: str, effective_model: str, effective_api_key: str,
-                  base_url: str, include_resume_data: bool, task_id: str):
+                  base_url: str, include_resume_data: bool, task_id: str,
+                  refresh: bool = False):
     """Run the full pipeline in a background thread and store the result."""
     try:
         start_time = time.time()
@@ -117,6 +118,7 @@ def _run_pipeline(pdf_path: str, effective_model: str, effective_api_key: str,
                 model_name=effective_model,
                 api_key=effective_api_key,
                 base_url=base_url,
+                refresh=refresh,
             )
 
         model_params = MODEL_PARAMETERS.get(effective_model)
@@ -339,6 +341,7 @@ async def score_resume(
     file: UploadFile = File(...),
     include_resume_data: bool = False,
     in_background: bool = Body(False),
+    refresh: bool = Body(False),
     model: Optional[str] = Body(None, examples=[DEFAULT_MODEL]),
     provider: Optional[str] = Body(None, examples=[PROVIDER]),
     base_url: Optional[str] = Body(None, examples=[OPENAI_BASE_URL]),
@@ -354,6 +357,8 @@ async def score_resume(
     - `file` (required): the resume PDF file
     - `in_background` (bool): when true, the task runs asynchronously and
       returns an ID immediately. Poll `GET /score?id=<id>` for the result.
+    - `refresh` (bool): when true, ignore cached GitHub data and refetch
+      all repository details, contributors, and events.
     - `model` (optional): model name override (e.g. `gpt-4o`, `gemini-2.5-pro`)
     - `provider` (optional): force provider (`ollama`, `gemini`, `openai`).
       When omitted, provider is inferred from the model name.
@@ -406,6 +411,7 @@ async def score_resume(
             base_url,
             include_resume_data,
             task_id,
+            refresh=refresh,
         )
 
         return JSONResponse({"status": "processing", "id": task_id})
@@ -426,6 +432,7 @@ async def score_resume(
         base_url,
         include_resume_data,
         task_id,
+        refresh=refresh,
     )
 
     with _task_lock:
