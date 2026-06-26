@@ -233,6 +233,14 @@ $ python uvicorn.main.py
 
 The server starts on `http://127.0.0.1:8000` by default (configurable via `API_HOST` / `API_PORT` env vars).
 
+### Docker
+
+```bash
+$ docker compose up --build
+```
+
+This builds the image and starts the server on port 8000. The `.env` file is loaded automatically, and `cache/`, `logs/`, and `resume_evaluations.csv` are mounted as volumes for persistence.
+
 Interactive docs are available at `http://127.0.0.1:8000/docs`.
 
 ### Endpoints
