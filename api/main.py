@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import time
 import tempfile
 import traceback
@@ -9,24 +8,23 @@ from pathlib import Path
 from typing import Optional
 
 # Ensure the parent (hiring-agent) directory is on sys.path so we can import
-# the top-level modules: pdf, github, evaluator, models, transform, prompt, config
+# the top-level modules: pdf, github, evaluator, models, transform, prompt
 _PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
 
-from fastapi import FastAPI, Request, File, UploadFile, Body, Depends
-from fastapi.responses import ORJSONResponse, Response
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, Request, File, UploadFile, Body, Depends  # noqa: E402
+from fastapi.responses import ORJSONResponse, Response  # noqa: E402
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials  # noqa: E402
 
-from .config import config, LOGGER, LOGGER_ACCESS
+from .config import LOGGER_ACCESS  # noqa: E402
 
-from pdf import PDFHandler
-from github import fetch_and_display_github_info
-from evaluator import ResumeEvaluator
-from models import JSONResume, EvaluationData, ModelProvider
-from prompt import DEFAULT_MODEL, MODEL_PARAMETERS, MODEL_PROVIDER_MAPPING
-from transform import convert_json_resume_to_text, convert_github_data_to_text
-from config import DEVELOPMENT_MODE  # top-level config
+from pdf import PDFHandler  # noqa: E402
+from github import fetch_and_display_github_info  # noqa: E402
+from evaluator import ResumeEvaluator  # noqa: E402
+from models import JSONResume, EvaluationData, ModelProvider  # noqa: E402
+from prompt import DEFAULT_MODEL, MODEL_PARAMETERS, MODEL_PROVIDER_MAPPING  # noqa: E402
+from transform import convert_json_resume_to_text, convert_github_data_to_text  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # FastAPI application

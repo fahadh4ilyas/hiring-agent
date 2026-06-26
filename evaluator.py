@@ -1,22 +1,17 @@
-from typing import Dict, List, Optional, Tuple, Any
-from pydantic import BaseModel, Field, field_validator
-from models import JSONResume, EvaluationData
+from models import EvaluationData
 from llm_utils import initialize_llm_provider, extract_json_from_response
 import logging
 import json
-import re
 
 MAX_BONUS_POINTS = 20
 MIN_FINAL_SCORE = -20
 MAX_FINAL_SCORE = 120
 
-from prompt import (
+from prompt import (  # noqa: E402
     DEFAULT_MODEL,
     MODEL_PARAMETERS,
-    MODEL_PROVIDER_MAPPING,
-    GEMINI_API_KEY,
 )
-from prompts.template_manager import TemplateManager
+from prompts.template_manager import TemplateManager  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

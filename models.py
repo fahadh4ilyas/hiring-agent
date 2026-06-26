@@ -1,5 +1,5 @@
-from typing import List, Optional, Dict, Tuple, Any, Protocol, runtime_checkable
-from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Dict, Any, Protocol, runtime_checkable
+from pydantic import BaseModel, Field
 from enum import Enum
 
 

@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import time
 import logging
@@ -8,11 +7,6 @@ import pymupdf
 from models import (
     JSONResume,
     Basics,
-    Work,
-    Education,
-    Skill,
-    Project,
-    Award,
     BasicsSection,
     WorkSection,
     EducationSection,
@@ -22,12 +16,10 @@ from models import (
 )
 from llm_utils import initialize_llm_provider, extract_json_from_response
 from pymupdf_rag import to_markdown
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict
 from prompt import (
     DEFAULT_MODEL,
     MODEL_PARAMETERS,
-    MODEL_PROVIDER_MAPPING,
-    GEMINI_API_KEY,
 )
 from prompts.template_manager import TemplateManager
 from transform import transform_parsed_data

@@ -6,7 +6,7 @@ import datetime
 import time
 from pathlib import Path
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from models import GitHubProfile
 from pdf import logger
 from prompts.template_manager import TemplateManager
@@ -85,7 +85,7 @@ def _fetch_github_api(api_url, params=None):
                 f"⚠️  GitHub API rate limit low: {remaining}/{limit} requests remaining. Resets at {reset_time}"
             )
             print(
-                f"💡 Tip: Set GITHUB_TOKEN environment variable to increase rate limits (60/hour → 5000/hour)"
+                "💡 Tip: Set GITHUB_TOKEN environment variable to increase rate limits (60/hour → 5000/hour)"
             )
 
             if wait_seconds > 0:
@@ -93,7 +93,7 @@ def _fetch_github_api(api_url, params=None):
                     f"⏳ Proactively sleeping for {wait_seconds} seconds until rate limit resets..."
                 )
                 time.sleep(wait_seconds)
-                print(f"✅ Rate limit should be reset now. Continuing...")
+                print("✅ Rate limit should be reset now. Continuing...")
         elif remaining < 100:
             logger.info(
                 f"ℹ️  GitHub API rate limit: {remaining}/{limit} requests remaining"

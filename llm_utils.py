@@ -3,7 +3,7 @@ Utility functions for LLM providers.
 """
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from models import ModelProvider, OllamaProvider, GeminiProvider, OpenAIProvider
 from prompt import MODEL_PROVIDER_MAPPING, GEMINI_API_KEY, OPENAI_API_KEY, OPENAI_BASE_URL
 

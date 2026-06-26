@@ -1,16 +1,14 @@
-version: "3.8"
-
 services:
   hiring-agent:
     build: .
     container_name: hiring-agent
     ports:
-      - "8000:8000"
+      - "8181:8181"
     env_file:
       - .env
     environment:
       - API_HOST=0.0.0.0
-      - API_PORT=8000
+      - API_PORT=8181
     volumes:
       - ./cache:/app/cache
       - ./logs:/app/logs
