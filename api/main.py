@@ -23,7 +23,7 @@ from pdf import PDFHandler  # noqa: E402
 from github import fetch_and_display_github_info  # noqa: E402
 from evaluator import ResumeEvaluator  # noqa: E402
 from models import JSONResume, EvaluationData, ModelProvider  # noqa: E402
-from prompt import DEFAULT_MODEL, MODEL_PARAMETERS, MODEL_PROVIDER_MAPPING  # noqa: E402
+from prompt import DEFAULT_MODEL, MODEL_PARAMETERS, MODEL_PROVIDER_MAPPING, PROVIDER, OPENAI_BASE_URL  # noqa: E402
 from transform import convert_json_resume_to_text, convert_github_data_to_text  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -169,9 +169,9 @@ async def score_resume(
     request: Request,
     file: UploadFile = File(...),
     include_resume_data: bool = False,
-    model: Optional[str] = Body(None),
-    provider: Optional[str] = Body(None),
-    base_url: Optional[str] = Body(None),
+    model: Optional[str] = Body(None, examples=[DEFAULT_MODEL]),
+    provider: Optional[str] = Body(None, examples=[PROVIDER]),
+    base_url: Optional[str] = Body(None, examples=[OPENAI_BASE_URL or "https://api.openai.com/v1"]),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """
