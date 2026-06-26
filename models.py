@@ -8,6 +8,7 @@ class ModelProvider(Enum):
 
     OLLAMA = "ollama"
     GEMINI = "gemini"
+    OPENAI = "openai"
 
 
 @runtime_checkable
@@ -389,3 +390,60 @@ class GeminiProvider:
                     f"Retrying in {sleep_time}s..."
                 )
                 time.sleep(sleep_time)
+
+
+class OpenAIProvider:
+    """OpenAI-compatible API provider implementation.
+
+    Supports OpenAI, Azure OpenAI, and any OpenAI-compatible endpoint
+    by accepting a configurable base_url.
+    """
+
+    def __init__(self, api_key: str, base_url: str = None):
+        import openai
+
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+
+        self.client = openai.OpenAI(**client_kwargs)
+
+    def chat(
+        self,
+        model: str,
+        messages: List[Dict[str, str]],
+        options: Dict[str, Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Send a chat request to an OpenAI-compatible API."""
+        chat_params = {
+            "model": model,
+            "messages": messages,
+        }
+
+        if options:
+            if "temperature" in options:
+                chat_params["temperature"] = options["temperature"]
+            if "top_p" in options:
+                chat_params["top_p"] = options["top_p"]
+
+        # Handle structured output (response_format) via json_schema
+        if "format" in kwargs:
+            schema = kwargs["format"]
+            chat_params["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "response",
+                    "strict": True,
+                    "schema": schema,
+                },
+            }
+
+        response = self.client.chat.completions.create(**chat_params)
+
+        return {
+            "message": {
+                "role": "assistant",
+                "content": response.choices[0].message.content,
+            }
+        }

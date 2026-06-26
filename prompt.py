@@ -41,6 +41,14 @@ MODEL_PARAMETERS = {
     "gemini-2.5-flash-lite": {"temperature": 0.1, "top_p": 0.9},
     "gemini-3.5-flash": {"temperature": 0.1, "top_p": 0.9},
     "gemini-3.1-flash-lite": {"temperature": 0.1, "top_p": 0.9},
+    # OpenAI / OpenAI-compatible models
+    "gpt-4o": {"temperature": 0.1, "top_p": 0.9},
+    "gpt-4o-mini": {"temperature": 0.1, "top_p": 0.9},
+    "gpt-4.1": {"temperature": 0.1, "top_p": 0.9},
+    "gpt-4.1-mini": {"temperature": 0.1, "top_p": 0.9},
+    "gpt-4.1-nano": {"temperature": 0.1, "top_p": 0.9},
+    "o4-mini": {"temperature": 0.1, "top_p": 0.9},
+    "o3": {"temperature": 0.1, "top_p": 0.9},
 }
 
 # Model provider mapping
@@ -61,7 +69,17 @@ MODEL_PROVIDER_MAPPING = {
     "gemini-2.5-pro": ModelProvider.GEMINI,
     "gemini-3.5-flash": ModelProvider.GEMINI,
     "gemini-3.1-flash-lite": ModelProvider.GEMINI,
+    # OpenAI / OpenAI-compatible models
+    "gpt-4o": ModelProvider.OPENAI,
+    "gpt-4o-mini": ModelProvider.OPENAI,
+    "gpt-4.1": ModelProvider.OPENAI,
+    "gpt-4.1-mini": ModelProvider.OPENAI,
+    "gpt-4.1-nano": ModelProvider.OPENAI,
+    "o4-mini": ModelProvider.OPENAI,
+    "o3": ModelProvider.OPENAI,
 }
 
 # Get API keys from environment
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "")

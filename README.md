@@ -1,6 +1,6 @@
 # Hiring Agent
 
-<p align="center"><strong>Resume-to-Score pipeline</strong> that extracts structured data from PDFs, enriches with GitHub signals, and outputs a fair, explainable evaluation.</p>
+<p align="center"><strong>Resume-to-Score pipeline</strong> that extracts structured data from PDFs, enriches with GitHub signals, and outputs a fair, explainable evaluation. Supports Ollama (local), Google Gemini, and any OpenAI-compatible API.</p>
 
 <p align="center">
   <a href="https://www.python.org/downloads/release/python-3110/">
@@ -27,6 +27,7 @@
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
 - [CLI usage](#cli-usage)
+- [API usage](#api-usage)
 - [Directory layout](#directory-layout)
 - [Provider details](#provider-details)
 - [Contributing](#contributing)
@@ -85,11 +86,12 @@ Hiring Agent parses a resume PDF to Markdown, extracts sectioned JSON using a lo
 
   The repository pins `.python-version` to 3.11.13.
 
-- **One LLM backend** (either of them)
+- **One LLM backend** (any of them)
 
   - **Ollama** for local models
     Install from the [official site](https://ollama.com/), then run `ollama serve`.
   - **Google Gemini** if you have an API key, get it from [here](https://aistudio.google.com/api-keys).
+  - **OpenAI-compatible** — any API that speaks the OpenAI Chat Completions format (OpenAI, Azure, local servers, etc.).
 
 ### Quick setup with pip
 
@@ -124,6 +126,8 @@ $ ollama pull gemma3:12b
 $ ollama pull gemma3:1b
 ```
 
+> **Note:** Ollama is only needed when using `LLM_PROVIDER=ollama`. Gemini and OpenAI-compatible providers work over the network and don't require local model pulls.
+
 ---
 
 ## Configuration
@@ -138,9 +142,11 @@ $ cp .env.example .env
 
 | Variable         | Values                                      | Description                                                            |
 | ---------------- | ------------------------------------------- | ---------------------------------------------------------------------- |
-| `LLM_PROVIDER`   | `ollama` or `gemini`                        | Chooses provider. Defaults to Ollama.                                  |
-| `DEFAULT_MODEL`  | for example `gemma3:4b` or `gemini-2.5-pro` | Model name passed to the provider.                                     |
+| `LLM_PROVIDER`   | `ollama`, `gemini`, or `openai`             | Chooses provider. Defaults to Ollama.                                  |
+| `DEFAULT_MODEL`  | e.g. `gemma3:4b`, `gemini-2.5-pro`, `gpt-4o` | Model name passed to the provider.                                  |
 | `GEMINI_API_KEY` | string                                      | Required when `LLM_PROVIDER=gemini`.                                   |
+| `OPENAI_API_KEY` | string                                      | Required when `LLM_PROVIDER=openai`.                                   |
+| `OPENAI_BASE_URL`| string (optional)                           | Base URL for OpenAI-compatible endpoints.                              |
 | `GITHUB_TOKEN`   | optional                                    | Inherits from your shell environment, improves GitHub API rate limits. |
 
 Provider mapping lives in `prompt.py` and `models.py`. The `config.py` file has a single flag:
@@ -217,6 +223,57 @@ What happens:
 
 ---
 
+## API usage
+
+### Starting the server
+
+```bash
+$ python uvicorn.main.py
+```
+
+The server starts on `http://127.0.0.1:8000` by default (configurable via `API_HOST` / `API_PORT` env vars).
+
+Interactive docs are available at `http://127.0.0.1:8000/docs`.
+
+### Endpoints
+
+**`POST /score`** — score a resume PDF
+
+```bash
+curl -X POST http://127.0.0.1:8000/score \
+  -F "file=@resume.pdf" \
+  -F "include_resume_data=false"
+```
+
+Optional fields for overriding the LLM configuration per-request:
+
+| Field      | Source   | Description                                      |
+|------------|----------|--------------------------------------------------|
+| `model`    | Body     | Model name (e.g. `gpt-4o`, `gemini-2.5-pro`)     |
+| `provider` | Body     | Force provider: `ollama`, `gemini`, or `openai`   |
+| `base_url` | Body     | Base URL for OpenAI-compatible endpoints          |
+| `Authorization`| Header| `Bearer <token>` for the provider (overrides `.env`)|
+
+```bash
+# Example: use an OpenAI-compatible endpoint with a custom key
+curl -X POST http://127.0.0.1:8000/score \
+  -H "Authorization: Bearer sk-..." \
+  -F "file=@resume.pdf" \
+  -F "model=gpt-4o" \
+  -F "provider=openai" \
+  -F "base_url=https://api.openai.com/v1"
+```
+
+The response is a JSON object with category scores, bonus points, deductions, key strengths, areas for improvement, and a total score.
+
+**`GET /health`** — health check
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+---
+
 ## Directory layout
 
 ```text
@@ -246,7 +303,13 @@ What happens:
 ├── pymupdf_rag.py
 ├── requirements.txt
 ├── score.py
-└── transform.py
+├── transform.py
+├── uvicorn.main.py
+└── api/
+    ├── __init__.py
+    ├── config.py
+    ├── main.py
+    └── requirements.txt
 ```
 
 ---
@@ -265,6 +328,14 @@ What happens:
 - Set `DEFAULT_MODEL` to a supported Gemini model, for example `gemini-2.0-flash`
 - Provide `GEMINI_API_KEY`
 - The wrapper in `models.GeminiProvider` adapts responses to a unified format
+
+### OpenAI-compatible
+
+- Set `LLM_PROVIDER=openai`
+- Set `DEFAULT_MODEL` to any supported model, for example `gpt-4o`
+- Provide `OPENAI_API_KEY`
+- Optionally set `OPENAI_BASE_URL` for custom endpoints (Azure, local servers, etc.)
+- The wrapper in `models.OpenAIProvider` uses the OpenAI Python client and supports structured JSON output via `response_format`
 
 ---
 

@@ -36,13 +36,25 @@ logger = logging.getLogger(__name__)
 
 
 class PDFHandler:
-    def __init__(self):
+    def __init__(
+        self,
+        model_name: str = None,
+        api_key: str = None,
+        base_url: str = None,
+    ):
+        self.model_name = model_name or DEFAULT_MODEL
+        self.api_key = api_key
+        self.base_url = base_url
         self.template_manager = TemplateManager()
         self._initialize_llm_provider()
 
     def _initialize_llm_provider(self):
         """Initialize the appropriate LLM provider based on the model."""
-        self.provider = initialize_llm_provider(DEFAULT_MODEL)
+        self.provider = initialize_llm_provider(
+            self.model_name,
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
 
     def extract_text_from_pdf(self, pdf_path: str) -> Optional[str]:
         try:
@@ -69,11 +81,11 @@ class PDFHandler:
         try:
             start_time = time.time()
             logger.debug(
-                f"🔄 Extracting {section_name} section using {DEFAULT_MODEL}..."
+                f"🔄 Extracting {section_name} section using {self.model_name}..."
             )
 
             model_params = MODEL_PARAMETERS.get(
-                DEFAULT_MODEL, {"temperature": 0.1, "top_p": 0.9}
+                self.model_name, {"temperature": 0.1, "top_p": 0.9}
             )
 
             section_system_message = self.template_manager.render_template(
@@ -86,7 +98,7 @@ class PDFHandler:
                 return None
 
             chat_params = {
-                "model": DEFAULT_MODEL,
+                "model": self.model_name,
                 "messages": [
                     {"role": "system", "content": section_system_message},
                     {"role": "user", "content": prompt},

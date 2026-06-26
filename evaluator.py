@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class ResumeEvaluator:
-    def __init__(self, model_name: str = DEFAULT_MODEL, model_params: dict = None):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        model_params: dict = None,
+        api_key: str = None,
+        base_url: str = None,
+    ):
         if not model_name:
             raise ValueError("Model name cannot be empty")
 
@@ -30,12 +36,18 @@ class ResumeEvaluator:
         self.model_params = model_params or MODEL_PARAMETERS.get(
             model_name, {"temperature": 0.5, "top_p": 0.9}
         )
+        self.api_key = api_key
+        self.base_url = base_url
         self.template_manager = TemplateManager()
         self._initialize_llm_provider()
 
     def _initialize_llm_provider(self):
         """Initialize the appropriate LLM provider based on the model."""
-        self.provider = initialize_llm_provider(self.model_name)
+        self.provider = initialize_llm_provider(
+            self.model_name,
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
 
     def _load_evaluation_prompt(self, resume_text: str) -> str:
         criteria_template = self.template_manager.render_template(

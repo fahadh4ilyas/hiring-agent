@@ -331,9 +331,16 @@ def generate_profile_json(profile: GitHubProfile) -> Dict:
     return profile_data
 
 
-def generate_projects_json(projects: List[Dict]) -> List[Dict]:
+def generate_projects_json(
+    projects: List[Dict],
+    model_name: str = None,
+    api_key: str = None,
+    base_url: str = None,
+) -> List[Dict]:
     if not projects:
         return []
+
+    effective_model = model_name or DEFAULT_MODEL
 
     try:
         projects_data = []
@@ -367,16 +374,18 @@ def generate_projects_json(projects: List[Dict]) -> List[Dict]:
         )
 
         # Initialize the LLM provider
-        provider = initialize_llm_provider(DEFAULT_MODEL)
+        provider = initialize_llm_provider(
+            effective_model, api_key=api_key, base_url=base_url
+        )
 
         # Get model parameters
         model_params = MODEL_PARAMETERS.get(
-            DEFAULT_MODEL, {"temperature": 0.1, "top_p": 0.9}
+            effective_model, {"temperature": 0.1, "top_p": 0.9}
         )
 
         # Prepare chat parameters
         chat_params = {
-            "model": DEFAULT_MODEL,
+            "model": effective_model,
             "messages": [
                 {
                     "role": "system",
@@ -456,7 +465,12 @@ def generate_projects_json(projects: List[Dict]) -> List[Dict]:
         return projects_data
 
 
-def fetch_and_display_github_info(github_url: str) -> Dict:
+def fetch_and_display_github_info(
+    github_url: str,
+    model_name: str = None,
+    api_key: str = None,
+    base_url: str = None,
+) -> Dict:
     logger.info(f"{github_url}")
     github_profile = fetch_github_profile(github_url)
     if not github_profile:
@@ -470,7 +484,12 @@ def fetch_and_display_github_info(github_url: str) -> Dict:
         print("\n❌ No repositories found or failed to fetch repository details.")
 
     profile_json = generate_profile_json(github_profile)
-    projects_json = generate_projects_json(projects)
+    projects_json = generate_projects_json(
+        projects,
+        model_name=model_name,
+        api_key=api_key,
+        base_url=base_url,
+    )
 
     result = {
         "profile": profile_json,
