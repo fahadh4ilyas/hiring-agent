@@ -1,5 +1,4 @@
-from typing import Dict, List, Optional
-import pdb
+from typing import Dict, List
 from models import JSONResume
 
 
@@ -894,7 +893,7 @@ def convert_github_data_to_text(github_data: dict) -> str:
 
     if "profile" in github_data:
         profile = github_data["profile"]
-        github_text += f"GitHub Profile:\n"
+        github_text += "GitHub Profile:\n"
         github_text += f"- Username: {profile.get('username', 'N/A')}\n"
         github_text += f"- Name: {profile.get('name', 'N/A')}\n"
         github_text += f"- Bio: {profile.get('bio', 'N/A')}\n"
@@ -911,12 +910,26 @@ def convert_github_data_to_text(github_data: dict) -> str:
             github_text += f"{i}. {project.get('name', 'N/A')}\n"
             github_text += f"   Description: {project.get('description', 'N/A')}\n"
             github_text += f"   URL: {project.get('github_url', 'N/A')}\n"
+            github_text += f"   Project Type: {project.get('project_type', 'N/A')}\n"
             if "github_details" in project:
                 details = project["github_details"]
                 github_text += f"   Stars: {details.get('stars', 'N/A')}\n"
                 github_text += f"   Forks: {details.get('forks', 'N/A')}\n"
                 github_text += f"   Language: {details.get('language', 'N/A')}\n"
             github_text += "\n"
+
+    if "external_contributions" in github_data:
+        external = github_data["external_contributions"]
+        if external:
+            github_text += "\nExternal Open-Source Contributions (found via events API):\n"
+            for entry in external:
+                repo_name = entry.get("repo", "N/A")
+                event_count = len(entry.get("events", []))
+                event_types = set(e.get("type", "") for e in entry.get("events", []))
+                github_text += (
+                    f"- {repo_name}: {event_count} events "
+                    f"({', '.join(event_types)})\n"
+                )
 
     return github_text
 

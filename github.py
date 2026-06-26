@@ -218,6 +218,71 @@ def fetch_repo_contributors(owner: str, repo_name: str) -> list[dict]:
         return []
 
 
+def _is_significant_fork(repo: dict) -> bool:
+    """Check if a fork is of a significant upstream project (100+ stars)."""
+    parent = repo.get("parent", {}) or {}
+    return parent.get("stargazers_count", 0) >= 100
+
+
+def _fetch_user_events(username: str, per_page: int = 100) -> List[Dict]:
+    """Fetch recent public events (PRs, issues, pushes) for a user."""
+    status_code, events = _fetch_github_api(
+        f"https://api.github.com/users/{username}/events/public",
+        params={"per_page": per_page},
+    )
+    if status_code == 200:
+        return events
+    return []
+
+
+def _extract_external_contributions(
+    username: str, events: List[Dict]
+) -> List[Dict]:
+    """
+    Scan events for PRs and issues opened against repos the user doesn't own,
+    indicating external open-source contributions.
+    """
+    contributed_to = {}
+    for event in events:
+        repo_info = event.get("repo", {})
+        repo_name = repo_info.get("name", "")
+        if not repo_name or repo_name.startswith(f"{username}/"):
+            continue  # skip own repos
+
+        event_type = event.get("type", "")
+        payload = event.get("payload", {})
+        action = payload.get("action", "")
+
+        is_contribution = (
+            event_type == "PullRequestEvent"
+            and action in ("opened", "closed")
+        ) or (
+            event_type == "PullRequestReviewEvent"
+        ) or (
+            event_type == "IssuesEvent" and action == "opened"
+        ) or (
+            event_type == "PushEvent"
+        ) or (
+            event_type == "ForkEvent"
+        )
+
+        if is_contribution:
+            if repo_name not in contributed_to:
+                contributed_to[repo_name] = {
+                    "repo": repo_name,
+                    "events": [],
+                }
+            contributed_to[repo_name]["events"].append(
+                {
+                    "type": event_type,
+                    "action": action,
+                    "created_at": event.get("created_at", ""),
+                }
+            )
+
+    return list(contributed_to.values())
+
+
 def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
     try:
         username = extract_github_username(github_url)
@@ -234,7 +299,7 @@ def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
         if status_code == 200:
             projects = []
             for repo in repos_data:
-                if repo.get("fork") and repo.get("forks_count", 0) < 5:
+                if repo.get("fork") and not _is_significant_fork(repo):
                     continue
 
                 repo_name = repo.get("name")
@@ -246,9 +311,13 @@ def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
                     username, contributors_data
                 )
 
-                project_type = (
-                    "open_source" if contributor_count > 1 else "self_project"
-                )
+                project_type = "self_project"
+                if contributor_count > 1:
+                    project_type = "open_source"
+                elif repo.get("fork") and _is_significant_fork(repo):
+                    project_type = "open_source"  # fork of significant upstream project
+                elif repo.get("stargazers_count", 0) >= 5:
+                    project_type = "open_source"  # public project with community interest
 
                 project = {
                     "name": repo.get("name"),
@@ -483,6 +552,25 @@ def fetch_and_display_github_info(
     print("🔍 Fetching all repository details...")
     projects = fetch_all_github_repos(github_url)
 
+    # Fetch recent public events to find external contributions (PRs, issues)
+    username = extract_github_username(github_url)
+    external_contributions = []
+    if username:
+        print("🔍 Checking external contributions via events API...")
+        events = _fetch_user_events(username)
+        if events:
+            external_contributions = _extract_external_contributions(username, events)
+            if external_contributions:
+                repo_names = [c["repo"] for c in external_contributions]
+                print(
+                    f"✅ Found contributions to {len(external_contributions)} "
+                    f"external repos: {', '.join(repo_names)}"
+                )
+            else:
+                print("ℹ️ No recent external contributions found in events.")
+        else:
+            print("⚠️ Could not fetch user events.")
+
     if not projects:
         print("\n❌ No repositories found or failed to fetch repository details.")
 
@@ -498,6 +586,7 @@ def fetch_and_display_github_info(
         "profile": profile_json,
         "projects": projects_json,
         "total_projects": len(projects_json),
+        "external_contributions": external_contributions,
     }
 
     return result
