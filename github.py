@@ -5,14 +5,17 @@ import requests
 import datetime
 import time
 from pathlib import Path
-
 from typing import Dict, List, Optional
-from models import GitHubProfile
-from pdf import logger
-from prompts.template_manager import TemplateManager
-from prompt import DEFAULT_MODEL, MODEL_PARAMETERS
-from llm_utils import initialize_llm_provider, extract_json_from_response
-from config import DEVELOPMENT_MODE
+
+from dotenv import load_dotenv
+load_dotenv()  # noqa: E402
+
+from models import GitHubProfile  # noqa: E402
+from pdf import logger  # noqa: E402
+from prompts.template_manager import TemplateManager  # noqa: E402
+from prompt import DEFAULT_MODEL, MODEL_PARAMETERS  # noqa: E402
+from llm_utils import initialize_llm_provider, extract_json_from_response  # noqa: E402
+from config import DEVELOPMENT_MODE  # noqa: E402
 
 
 def _create_cache_filename(api_url: str, params: dict = None) -> str:
