@@ -1,0 +1,16 @@
+services:
+  hiring-agent:
+    build: .
+    container_name: hiring-agent
+    ports:
+      - "8181:8181"
+    env_file:
+      - .env
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8181
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+      - ./resume_evaluations.csv:/app/resume_evaluations.csv
+    restart: unless-stopped

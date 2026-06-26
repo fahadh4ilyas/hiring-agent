@@ -1,28 +1,29 @@
-from typing import Dict, List, Optional, Tuple, Any
-from pydantic import BaseModel, Field, field_validator
-from models import JSONResume, EvaluationData
+from models import EvaluationData
 from llm_utils import initialize_llm_provider, extract_json_from_response
 import logging
 import json
-import re
 
 MAX_BONUS_POINTS = 20
 MIN_FINAL_SCORE = -20
 MAX_FINAL_SCORE = 120
 
-from prompt import (
+from prompt import (  # noqa: E402
     DEFAULT_MODEL,
     MODEL_PARAMETERS,
-    MODEL_PROVIDER_MAPPING,
-    GEMINI_API_KEY,
 )
-from prompts.template_manager import TemplateManager
+from prompts.template_manager import TemplateManager  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
 
 class ResumeEvaluator:
-    def __init__(self, model_name: str = DEFAULT_MODEL, model_params: dict = None):
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        model_params: dict = None,
+        api_key: str = None,
+        base_url: str = None,
+    ):
         if not model_name:
             raise ValueError("Model name cannot be empty")
 
@@ -30,12 +31,18 @@ class ResumeEvaluator:
         self.model_params = model_params or MODEL_PARAMETERS.get(
             model_name, {"temperature": 0.5, "top_p": 0.9}
         )
+        self.api_key = api_key
+        self.base_url = base_url
         self.template_manager = TemplateManager()
         self._initialize_llm_provider()
 
     def _initialize_llm_provider(self):
         """Initialize the appropriate LLM provider based on the model."""
-        self.provider = initialize_llm_provider(self.model_name)
+        self.provider = initialize_llm_provider(
+            self.model_name,
+            api_key=self.api_key,
+            base_url=self.base_url,
+        )
 
     def _load_evaluation_prompt(self, resume_text: str) -> str:
         criteria_template = self.template_manager.render_template(

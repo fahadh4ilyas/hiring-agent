@@ -3,9 +3,15 @@ Utility functions for LLM providers.
 """
 
 import logging
-from typing import Any, Dict, Optional
-from models import ModelProvider, OllamaProvider, GeminiProvider
-from prompt import MODEL_PROVIDER_MAPPING, GEMINI_API_KEY
+from typing import Any, Optional
+from models import ModelProvider, OllamaProvider, GeminiProvider, OpenAIProvider
+from prompt import (
+    MODEL_PROVIDER_MAPPING,
+    PROVIDER,
+    GEMINI_API_KEY,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,26 +43,45 @@ def extract_json_from_response(response_text: str) -> str:
     return response_text
 
 
-def initialize_llm_provider(model_name: str) -> Any:
+def initialize_llm_provider(
+    model_name: str,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> Any:
     """
     Initialize the appropriate LLM provider based on the model name.
 
     Args:
         model_name: The name of the model to use
+        api_key: Optional API key override (takes precedence over env vars)
+        base_url: Optional base URL override (takes precedence over env vars)
 
     Returns:
-        An initialized LLM provider (either OllamaProvider or GeminiProvider)
+        An initialized LLM provider (OllamaProvider, GeminiProvider, or OpenAIProvider)
     """
-    # Default to Ollama provider
+    # Determine provider: model mapping takes precedence, then fall back to
+    # the LLM_PROVIDER env var (which itself defaults to ollama in prompt.py).
+    model_provider = MODEL_PROVIDER_MAPPING.get(model_name)
+    if model_provider is None:
+        model_provider = ModelProvider(PROVIDER)
+
     provider = OllamaProvider()
-    # If using Gemini and API key is available, use Gemini provider
-    model_provider = MODEL_PROVIDER_MAPPING.get(model_name, ModelProvider.OLLAMA)
+
     if model_provider == ModelProvider.GEMINI:
-        if not GEMINI_API_KEY:
+        effective_key = api_key or GEMINI_API_KEY
+        if not effective_key:
             logger.warning("⚠️ Gemini API key not found. Falling back to Ollama.")
         else:
             logger.info(f"🔄 Using Google Gemini API provider with model {model_name}")
-            provider = GeminiProvider(api_key=GEMINI_API_KEY)
+            provider = GeminiProvider(api_key=effective_key)
+    elif model_provider == ModelProvider.OPENAI:
+        effective_key = api_key or OPENAI_API_KEY
+        effective_url = base_url or OPENAI_BASE_URL or None
+        if not effective_key:
+            logger.warning("⚠️ OpenAI API key not found. Falling back to Ollama.")
+        else:
+            logger.info(f"🔄 Using OpenAI-compatible API provider with model {model_name}" + (f" (base_url: {effective_url})" if effective_url else ""))
+            provider = OpenAIProvider(api_key=effective_key, base_url=effective_url)
     else:
         logger.info(f"🔄 Using Ollama provider with model {model_name}")
     return provider
