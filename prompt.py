@@ -24,6 +24,16 @@ PROVIDER = os.getenv("LLM_PROVIDER", DEFAULT_PROVIDER.value)
 if PROVIDER not in [p.value for p in ModelProvider]:
     PROVIDER = DEFAULT_PROVIDER.value
 
+# If DEFAULT_MODEL wasn't explicitly set but PROVIDER was changed,
+# pick a sensible default model for the chosen provider.
+_PROVIDER_DEFAULTS = {
+    ModelProvider.OLLAMA.value: "gemma3:4b",
+    ModelProvider.GEMINI.value: "gemini-2.5-pro",
+    ModelProvider.OPENAI.value: "gpt-4o",
+}
+if not os.getenv("DEFAULT_MODEL") and PROVIDER != DEFAULT_PROVIDER.value:
+    DEFAULT_MODEL = _PROVIDER_DEFAULTS.get(PROVIDER, DEFAULT_MODEL_NAME)
+
 # Model-specific parameters
 MODEL_PARAMETERS = {
     # Ollama models

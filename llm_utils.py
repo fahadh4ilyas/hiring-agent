@@ -5,7 +5,13 @@ Utility functions for LLM providers.
 import logging
 from typing import Any, Optional
 from models import ModelProvider, OllamaProvider, GeminiProvider, OpenAIProvider
-from prompt import MODEL_PROVIDER_MAPPING, GEMINI_API_KEY, OPENAI_API_KEY, OPENAI_BASE_URL
+from prompt import (
+    MODEL_PROVIDER_MAPPING,
+    PROVIDER,
+    GEMINI_API_KEY,
+    OPENAI_API_KEY,
+    OPENAI_BASE_URL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +59,14 @@ def initialize_llm_provider(
     Returns:
         An initialized LLM provider (OllamaProvider, GeminiProvider, or OpenAIProvider)
     """
-    # Default to Ollama provider
+    # Determine provider: model mapping takes precedence, then fall back to
+    # the LLM_PROVIDER env var (which itself defaults to ollama in prompt.py).
+    model_provider = MODEL_PROVIDER_MAPPING.get(model_name)
+    if model_provider is None:
+        model_provider = ModelProvider(PROVIDER)
+
     provider = OllamaProvider()
-    # If using Gemini and API key is available, use Gemini provider
-    model_provider = MODEL_PROVIDER_MAPPING.get(model_name, ModelProvider.OLLAMA)
+
     if model_provider == ModelProvider.GEMINI:
         effective_key = api_key or GEMINI_API_KEY
         if not effective_key:
