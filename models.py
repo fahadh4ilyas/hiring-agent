@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any, Protocol, runtime_checkable
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
@@ -240,6 +240,12 @@ class Deductions(BaseModel):
         description="Total deduction points (stored as positive, applied as negative)",
     )
     reasons: str = Field(description="Reasons for deductions")
+
+    @field_validator("total", mode="before")
+    @classmethod
+    def ensure_non_negative(cls, v):
+        """Coerce negative values to positive — some LLMs return e.g. -8."""
+        return abs(float(v))
 
 
 class EvaluationData(BaseModel):

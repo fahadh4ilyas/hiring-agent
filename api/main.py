@@ -14,7 +14,7 @@ if _PARENT_DIR not in sys.path:
     sys.path.insert(0, _PARENT_DIR)
 
 from fastapi import FastAPI, Request, File, UploadFile, Body, Depends  # noqa: E402
-from fastapi.responses import ORJSONResponse, Response  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials  # noqa: E402
 
 from .config import LOGGER_ACCESS  # noqa: E402
@@ -46,7 +46,7 @@ security = HTTPBearer(auto_error=False)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    return ORJSONResponse(
+    return JSONResponse(
         {
             "error": str(exc),
             "traceback": "".join(
@@ -161,7 +161,7 @@ def _serialize_evaluation(evaluation: EvaluationData) -> dict:
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    return ORJSONResponse({"status": "ok"})
+    return JSONResponse({"status": "ok"})
 
 
 @app.post("/score")
@@ -171,7 +171,7 @@ async def score_resume(
     include_resume_data: bool = False,
     model: Optional[str] = Body(None, examples=[DEFAULT_MODEL]),
     provider: Optional[str] = Body(None, examples=[PROVIDER]),
-    base_url: Optional[str] = Body(None, examples=[OPENAI_BASE_URL or "https://api.openai.com/v1"]),
+    base_url: Optional[str] = Body(None, examples=[OPENAI_BASE_URL]),
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ):
     """
@@ -205,7 +205,7 @@ async def score_resume(
             provider_enum = ModelProvider(provider)
             MODEL_PROVIDER_MAPPING[effective_model] = provider_enum
         except ValueError:
-            return ORJSONResponse(
+            return JSONResponse(
                 {"error": f"Invalid provider '{provider}'. Use one of: {[p.value for p in ModelProvider]}"},
                 status_code=400,
             )
@@ -232,7 +232,7 @@ async def score_resume(
         resume_data: Optional[JSONResume] = pdf_handler.extract_json_from_pdf(pdf_path)
 
         if resume_data is None:
-            return ORJSONResponse(
+            return JSONResponse(
                 {"error": "Failed to extract structured data from the PDF."},
                 status_code=422,
             )
@@ -289,7 +289,7 @@ async def score_resume(
         if include_resume_data and resume_data:
             response_body["resume_data"] = resume_data.model_dump()
 
-        return ORJSONResponse(response_body)
+        return JSONResponse(response_body)
 
     finally:
         # Clean up the temporary PDF file
