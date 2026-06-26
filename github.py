@@ -29,14 +29,14 @@ def _create_cache_filename(api_url: str, params: dict = None) -> str:
     return filename
 
 
-def _fetch_github_api(api_url, params=None):
+def _fetch_github_api(api_url, params=None, refresh=False):
     headers = {}
     github_token = os.environ.get("GITHUB_TOKEN")
     if github_token:
         headers["Authorization"] = f"token {github_token}"
 
     cache_filename = _create_cache_filename(api_url, params)
-    if DEVELOPMENT_MODE and os.path.exists(cache_filename):
+    if not refresh and DEVELOPMENT_MODE and os.path.exists(cache_filename):
         print(f"Loading cached GitHub data from {cache_filename}")
         try:
             cached_data = json.loads(Path(cache_filename).read_text(encoding="utf-8"))
@@ -141,7 +141,7 @@ def extract_github_username(github_url: str) -> Optional[str]:
     return None
 
 
-def fetch_github_profile(github_url: str) -> Optional[GitHubProfile]:
+def fetch_github_profile(github_url: str, refresh: bool = False) -> Optional[GitHubProfile]:
     try:
         username = extract_github_username(github_url)
         logger.info(f"{username}")
@@ -151,7 +151,7 @@ def fetch_github_profile(github_url: str) -> Optional[GitHubProfile]:
 
         api_url = f"https://api.github.com/users/{username}"
 
-        status_code, data = _fetch_github_api(api_url)
+        status_code, data = _fetch_github_api(api_url, refresh=refresh)
 
         if status_code == 200:
             profile = GitHubProfile(
@@ -202,11 +202,11 @@ def fetch_contributions_count(owner: str, contributors_data):
     return user_contributions, total_contributions
 
 
-def fetch_repo_contributors(owner: str, repo_name: str) -> list[dict]:
+def fetch_repo_contributors(owner: str, repo_name: str, refresh: bool = False) -> list[dict]:
     try:
         api_url = f"https://api.github.com/repos/{owner}/{repo_name}/contributors"
 
-        status_code, contributors_data = _fetch_github_api(api_url)
+        status_code, contributors_data = _fetch_github_api(api_url, refresh=refresh)
 
         if status_code == 200:
             return contributors_data
@@ -283,7 +283,7 @@ def _extract_external_contributions(
     return list(contributed_to.values())
 
 
-def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
+def fetch_all_github_repos(github_url: str, max_repos: int = 100, refresh: bool = False) -> List[Dict]:
     try:
         username = extract_github_username(github_url)
         if not username:
@@ -294,7 +294,7 @@ def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
 
         params = {"sort": "updated", "per_page": min(max_repos, 100), "type": "all"}
 
-        status_code, repos_data = _fetch_github_api(api_url, params=params)
+        status_code, repos_data = _fetch_github_api(api_url, params=params, refresh=refresh)
 
         if status_code == 200:
             projects = []
@@ -304,7 +304,7 @@ def fetch_all_github_repos(github_url: str, max_repos: int = 100) -> List[Dict]:
 
                 repo_name = repo.get("name")
 
-                contributors_data = fetch_repo_contributors(username, repo_name)
+                contributors_data = fetch_repo_contributors(username, repo_name, refresh=refresh)
                 contributor_count = len(contributors_data)
 
                 user_contributions, total_contributions = fetch_contributions_count(
@@ -542,15 +542,16 @@ def fetch_and_display_github_info(
     model_name: str = None,
     api_key: str = None,
     base_url: str = None,
+    refresh: bool = False,
 ) -> Dict:
     logger.info(f"{github_url}")
-    github_profile = fetch_github_profile(github_url)
+    github_profile = fetch_github_profile(github_url, refresh=refresh)
     if not github_profile:
         print("\n❌ Failed to fetch GitHub profile details.")
         return {}
 
     print("🔍 Fetching all repository details...")
-    projects = fetch_all_github_repos(github_url)
+    projects = fetch_all_github_repos(github_url, refresh=refresh)
 
     # Fetch recent public events to find external contributions (PRs, issues)
     username = extract_github_username(github_url)
